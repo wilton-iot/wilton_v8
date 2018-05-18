@@ -62,19 +62,6 @@ v8::Local<v8::String> string_to_jsval(v8::Isolate* isolate, const std::string& s
     return string_to_jsval(isolate, str.data(), str.length());
 }
 
-v8::Local<v8::Value> json_to_jsval(v8::Local<v8::Context>& ctx, const sl::json::value& json) {
-    auto isolate = ctx->GetIsolate();
-    v8::EscapableHandleScope handle_scope(isolate);
-    auto json_val = string_to_jsval(isolate, json.dumps());
-    auto maybe = v8::JSON::Parse(ctx, json_val);
-    if (maybe.IsEmpty()) {
-        auto empty = v8::String::NewFromUtf8(isolate, "", v8::NewStringType::kNormal).ToLocalChecked();
-        return handle_scope.Escape(empty);
-    }
-    auto res = maybe.ToLocalChecked();
-    return handle_scope.Escape(res);
-}
-
 void throw_js_exception(v8::Local<v8::Context>& ctx, const std::string& msg) {
     // v8::Exception::Error segfaults for some reason
     auto isolate = ctx->GetIsolate();
