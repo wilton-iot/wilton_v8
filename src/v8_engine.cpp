@@ -36,16 +36,46 @@
 #include "staticlib/support.hpp"
 #include "staticlib/utils.hpp"
 
+#include "wilton/wilton.h"
 #include "wilton/wiltoncall.h"
 #include "wilton/wilton_loader.h"
 
 #include "wilton/support/exception.hpp"
 #include "wilton/support/logging.hpp"
 
+#include "v8_config.hpp"
+
 namespace wilton {
 namespace v8eng {
 
 namespace { // anonymous
+
+v8_config get_config() {
+    char* conf = nullptr;
+    int conf_len = 0;
+    auto err = wilton_config(std::addressof(conf), std::addressof(conf_len));
+    if (nullptr != err) support::throw_wilton_error(err, TRACEMSG(err));
+    auto deferred = sl::support::defer([conf] () STATICLIB_NOEXCEPT {
+        wilton_free(conf);
+    });
+    auto json = sl::json::load({const_cast<const char*>(conf), conf_len});
+    return v8_config(json["environmentVariables"]);
+}
+
+void set_constraints(v8::ResourceConstraints& constraints, v8_config& cfg) {
+    if (cfg.max_semi_space_size_in_kb > 0) {
+        constraints.set_max_semi_space_size_in_kb(cfg.max_semi_space_size_in_kb);
+    }
+    if (cfg.max_old_space_size > 0) {
+        constraints.set_max_old_space_size(cfg.max_old_space_size);
+    }
+    if (cfg.code_range_size > 0) {
+        constraints.set_code_range_size(cfg.code_range_size);
+    }
+    if (cfg.max_zone_pool_size > 0) {
+        constraints.set_max_zone_pool_size(cfg.max_zone_pool_size);
+    }
+}
 
 v8::Local<v8::String> string_to_jsval(v8::Isolate* isolate, const char* str, size_t str_len) STATICLIB_NOEXCEPT {
     v8::EscapableHandleScope handle_scope(isolate);
@@ -240,8 +270,11 @@ public:
     }
 
     impl(sl::io::span<const char> init_code) {
-        wilton::support::log_info("wilton.engine.v8.init", "Initializing engine instance ...");
+        auto cfg = get_config();
+        wilton::support::log_info("wilton.engine.v8.init", std::string() + "Initializing engine instance," +
+                " config: [" + cfg.to_json().dumps() + "]");
         v8::Isolate::CreateParams create_params;
+        set_constraints(create_params.constraints, cfg);
         create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
         this->isolate = v8::Isolate::New(create_params);
         v8::HandleScope handle_scope(isolate);
@@ -297,7 +330,8 @@ public:
     }
 
     static void initialize() {
-        v8::Platform* platform = v8::platform::CreateDefaultPlatform(/* thread_pool_size */ 2);
+        auto cfg = get_config();
+        v8::Platform* platform = v8::platform::CreateDefaultPlatform(static_cast<int>(cfg.thread_pool_size));
         v8::V8::InitializePlatform(platform);
         v8::V8::InitializeICU();
         v8::V8::Initialize();
