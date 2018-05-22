@@ -99,7 +99,7 @@ private:
         }
     }
 
-    static uint16_t str_as_u32(const sl::json::field& fi, const std::string& name) {
+    static uint32_t str_as_u32(const sl::json::field& fi, const std::string& name) {
         auto str = fi.as_string_nonempty_or_throw(name);
         try {
             return sl::utils::parse_uint32(str);
