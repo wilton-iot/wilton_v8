@@ -20,6 +20,8 @@
  * 
  * Created on May 8, 2018, 9:59 PM
  */
+
+#include <cstdio>
 #include <memory>
 #include <string>
 
@@ -65,6 +67,8 @@ void clean_tls(void*, const char* thread_id, int thread_id_len) {
 
 extern "C" char* wilton_module_init() {
     try {
+        puts("WARN: Available version of V8 JS engine (6.7.288.32) is outdated,"
+                " consider using JavaScriptCore engine instead");
         wilton::v8eng::v8_engine::initialize();
         wilton::v8eng::shared_tlmap();
         auto err = wilton_register_tls_cleaner(nullptr, wilton::v8eng::clean_tls);
